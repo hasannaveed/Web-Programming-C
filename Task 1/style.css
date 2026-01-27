@@ -1,0 +1,35 @@
+/* Footer at bottom */
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    font-family: Arial, sans-serif;
+}
+
+main {
+    flex: 1;
+}
+
+/* Simple auth form */
+.auth-simple {
+    max-width: 350px;
+    margin: auto;
+    margin-top: 80px;
+}
+
+.back-link {
+    display: block;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.page-content {
+    flex: 1;
+}
+
+.my-5{
+    flex: 1;
+}
