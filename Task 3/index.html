@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>jQuery To-Do List</title>
+
+  
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .todo-container {
+      background: white;
+      padding: 20px;
+      width: 420px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    h2 { text-align: center; margin-bottom: 5px; }
+
+    .counter {
+      text-align: center;
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #555;
+    }
+
+    input[type="text"] { width: 65%; padding: 8px; }
+    button { padding: 8px 10px; cursor: pointer; }
+
+    .filters {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin-top: 15px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px;
+      margin-bottom: 6px;
+      background: #eee;
+      border-radius: 5px;
+    }
+
+    li.completed {
+      text-decoration: line-through;
+      color: gray;
+      background: #ddd;
+    }
+
+    .delete { color: red; cursor: pointer; font-weight: bold; }
+
+    .load { width: 100%; margin-top: 10px; background: #007bff; color: white; border: none; }
+
+    .task-text { flex: 1; margin-left: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="todo-container">
+  <h2>To-Do List</h2>
+  <div class="counter" id="counter">0 / 0 completed</div>
+
+  <input type="text" id="taskInput" placeholder="Enter a task">
+  <button id="addTask">Add</button>
+
+  <button class="load" id="loadTodos">Load 50 Tasks from API</button>
+
+  <div class="filters">
+    <button id="showAll">All</button>
+    <button id="showActive">Pending</button>
+    <button id="showCompleted">Completed</button>
+  </div>
+
+  <ul id="taskList"></ul>
+</div>
+
+<script>
+$(document).ready(function () {
+
+  function updateCounter() {
+    const total = $('#taskList li').length;
+    const completed = $('#taskList li.completed').length;
+    $('#counter').text(`${completed} / ${total} completed`);
+  }
+
+  function addTaskToList(task, completed) {
+    let li = `<li class="${completed ? 'completed' : ''}">
+      <input type="checkbox" class="complete" ${completed ? 'checked' : ''}>
+      <span class="task-text">${task}</span>
+      <span class="delete">✖</span>
+    </li>`;
+    $('#taskList').append(li);
+    updateCounter();
+  }
+
+  $('#addTask').click(function () {
+    let task = $('#taskInput').val().trim();
+    if (task !== '') {
+      addTaskToList(task, false);
+      $('#taskInput').val('');
+    }
+  });
+
+  $('#taskInput').keypress(function (e) {
+    if (e.which === 13) $('#addTask').click();
+  });
+
+  // Load MORE tasks from API
+  $('#loadTodos').click(function () {
+    fetch('https://jsonplaceholder.typicode.com/todos?_limit=50')
+      .then(res => res.json())
+      .then(data => {
+        $('#taskList').empty();
+        data.forEach(todo => addTaskToList(todo.title, todo.completed));
+      });
+  });
+
+  // Checkbox = complete task
+  $('#taskList').on('change', '.complete', function () {
+    $(this).closest('li').toggleClass('completed');
+    updateCounter();
+  });
+
+  // Delete task
+  $('#taskList').on('click', '.delete', function () {
+    $(this).closest('li').remove();
+    updateCounter();
+  });
+
+  // Filters
+  $('#showAll').click(() => $('#taskList li').show());
+  $('#showActive').click(() => {
+    $('#taskList li').show();
+    $('#taskList li.completed').hide();
+  });
+  $('#showCompleted').click(() => {
+    $('#taskList li').hide();
+    $('#taskList li.completed').show();
+  });
+
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archery Master - Interactive Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a202c;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        #game-area {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 100%);
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        /* Grass at the bottom */
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 15%;
+            background: linear-gradient(to bottom, #4ade80 0%, #166534 100%);
+            z-index: 10;
+        }
+
+        /* Target Styling */
+        #target {
+            position: absolute;
+            border-radius: 50%;
+            background: repeating-radial-gradient(
+                circle,
+                white 0%,
+                white 10%,
+                black 10%,
+                black 20%,
+                #3b82f6 20%,
+                #3b82f6 30%,
+                black 30%,
+                black 40%,
+                #ef4444 40%,
+                #ef4444 50%
+            );
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 20;
+            transition: width 0.3s, height 0.3s;
+        }
+
+        /* Arrow Styling */
+        .arrow {
+            position: absolute;
+            width: 40px;
+            height: 4px;
+            background-color: #78350f;
+            z-index: 15;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+        
+        .arrow::after {
+            content: '';
+            position: absolute;
+            right: -10px;
+            top: -3px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid #78350f;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+        }
+
+        .arrow::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 0;
+            width: 5px;
+            height: 4px;
+            background-color: #d1d5db;
+        }
+
+        /* Bow Styling */
+        #bow {
+            position: absolute;
+            bottom: 50%;
+            left: 5%;
+            transform: translateY(50%);
+            width: 60px;
+            height: 100px;
+            z-index: 25;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bow-curve {
+            width: 20px;
+            height: 80px;
+            border: 4px solid #5c3a21;
+            border-radius: 50%;
+            border-left-color: transparent;
+            position: relative;
+        }
+        
+        .bow-string {
+            position: absolute;
+            left: 12px;
+            top: 10px;
+            width: 1px;
+            height: 60px;
+            background-color: #fff;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .hud-panel {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #1f2937;
+            display: flex;
+            gap: 15px;
+        }
+
+        /* Start/Game Over Screen */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+        }
+
+        .menu-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .btn {
+            background-color: #2563eb;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Clouds for atmosphere */
+        .cloud {
+            position: absolute;
+            background: white;
+            border-radius: 50px;
+            opacity: 0.8;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-area">
+        <!-- Background Elements -->
+        <div class="cloud" style="top: 10%; left: 20%; width: 120px; height: 40px;"></div>
+        <div class="cloud" style="top: 15%; left: 70%; width: 160px; height: 50px;"></div>
+        <div class="cloud" style="top: 8%; left: 45%; width: 100px; height: 35px;"></div>
+        
+        <div class="ground"></div>
+
+        <!-- Game Elements -->
+        <div id="bow">
+            <div class="bow-curve"></div>
+            <div class="bow-string"></div>
+        </div>
+
+        <div id="target"></div>
+        
+        <!-- Arrows will be appended here -->
+        <div id="arrows-container"></div>
+
+        <!-- UI Layer -->
+        <div id="ui-layer">
+            <div class="hud-panel">
+                <div>🏹 SCORE: <span id="score-display">0</span></div>
+                <div>⏱️ TIME: <span id="time-display">60</span>s</div>
+            </div>
+        </div>
+
+        <!-- Menu / Game Over Screen -->
+        <div id="menu-screen">
+            <div class="menu-card">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2" id="menu-title">Archery Master</h1>
+                <p class="text-gray-600 mb-6" id="menu-desc">Click anywhere to shoot the moving target!</p>
+                
+                <div id="stats-container" class="hidden mb-4">
+                    <div class="text-2xl font-bold text-blue-600 mb-1">Game Over!</div>
+                    <div class="text-lg text-gray-700">Final Score: <span id="final-score">0</span></div>
+                </div>
+
+                <button class="btn" id="start-btn">Start Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Game State Variables ---
+        const state = {
+            score: 0,
+            timeLeft: 60,
+            isPlaying: false,
+            gameLoopId: null,
+            timerId: null,
+            targetX: 0,
+            targetY: 0,
+            targetSpeedX: 3,
+            targetSpeedY: 2,
+            targetSize: 80,
+            difficultyMultiplier: 1
+        };
+
+        // --- DOM Elements ---
+        const elements = {
+            gameArea: document.getElementById('game-area'),
+            target: document.getElementById('target'),
+            bow: document.getElementById('bow'),
+            arrowsContainer: document.getElementById('arrows-container'),
+            scoreDisplay: document.getElementById('score-display'),
+            timeDisplay: document.getElementById('time-display'),
+            menuScreen: document.getElementById('menu-screen'),
+            menuTitle: document.getElementById('menu-title'),
+            menuDesc: document.getElementById('menu-desc'),
+            startBtn: document.getElementById('start-btn'),
+            statsContainer: document.getElementById('stats-container'),
+            finalScore: document.getElementById('final-score')
+        };
+
+        // --- Initialization ---
+        
+        // Event Listeners
+        elements.startBtn.addEventListener('click', startGame);
+        elements.gameArea.addEventListener('mousedown', (e) => {
+            if (state.isPlaying && e.target !== elements.startBtn && !elements.menuScreen.contains(e.target)) {
+                shootArrow(e);
+            }
+        });
+
+        // Prevent context menu on right click
+        elements.gameArea.addEventListener('contextmenu', e => e.preventDefault());
+
+        // --- Core Functions ---
+
+        function startGame() {
+            resetState();
+            elements.menuScreen.classList.add('hidden');
+            state.isPlaying = true;
+            
+            // Initial target position
+            resetTargetPosition();
+            
+            // Start loops
+            state.gameLoopId = requestAnimationFrame(gameLoop);
+            state.timerId = setInterval(updateTimer, 1000);
+            
+            updateUI();
+        }
+
+        function resetState() {
+            state.score = 0;
+            state.timeLeft = 60;
+            state.difficultyMultiplier = 1;
+            state.targetSize = 80;
+            state.targetSpeedX = 3;
+            state.targetSpeedY = 2;
+            
+            // Clear arrows
+            elements.arrowsContainer.innerHTML = '';
+            
+            // Reset UI
+            elements.statsContainer.classList.add('hidden');
+            elements.menuTitle.textContent = "Archery Master";
+            elements.menuDesc.textContent = "Click anywhere to shoot the moving target!";
+            elements.startBtn.textContent = "Start Game";
+        }
+
+        function gameOver() {
+            state.isPlaying = false;
+            cancelAnimationFrame(state.gameLoopId);
+            clearInterval(state.timerId);
+            
+            elements.menuTitle.textContent = "Time's Up!";
+            elements.menuDesc.textContent = "Great shooting!";
+            elements.finalScore.textContent = state.score;
+            elements.statsContainer.classList.remove('hidden');
+            elements.startBtn.textContent = "Play Again";
+            elements.menuScreen.classList.remove('hidden');
+        }
+
+        // --- Game Loop ---
+
+        function gameLoop() {
+            if (!state.isPlaying) return;
+            
+            moveTarget();
+            moveArrows();
+            checkCollisions();
+            
+            state.gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Target Logic ---
+
+        function resetTargetPosition() {
+            const areaWidth = elements.gameArea.clientWidth;
+            const areaHeight = elements.gameArea.clientHeight;
+            const padding = state.targetSize;
+
+            state.targetX = Math.random() * (areaWidth - padding * 2) + padding;
+            state.targetY = Math.random() * (areaHeight * 0.6) + 50; // Keep in upper 60%
+            
+            updateTargetStyle();
+        }
+
+        function moveTarget() {
+            const areaWidth = elements.gameArea.clientWidth;
+            const areaHeight = elements.gameArea.clientHeight;
+            const groundHeight = areaHeight * 0.15;
+            const maxY = areaHeight - groundHeight - state.targetSize - 10;
+
+            state.targetX += state.targetSpeedX * state.difficultyMultiplier;
+            state.targetY += state.targetSpeedY * state.difficultyMultiplier;
+
+            // Bounce off walls
+            if (state.targetX <= 0 || state.targetX >= areaWidth - state.targetSize) {
+                state.targetSpeedX *= -1;
+                state.targetX = Math.max(0, Math.min(state.targetX, areaWidth - state.targetSize));
+            }
+            
+            // Bounce off top/bottom (within playable area)
+            if (state.targetY <= 50 || state.targetY >= maxY) {
+                state.targetSpeedY *= -1;
+                state.targetY = Math.max(50, Math.min(state.targetY, maxY));
+            }
+
+            updateTargetStyle();
+        }
+
+        function updateTargetStyle() {
+            elements.target.style.width = `${state.targetSize}px`;
+            elements.target.style.height = `${state.targetSize}px`;
+            elements.target.style.left = `${state.targetX}px`;
+            elements.target.style.top = `${state.targetY}px`;
+        }
+
+        // --- Arrow Logic ---
+
+        function shootArrow(event) {
+            // Calculate angle to mouse position
+            const rect = elements.gameArea.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            
+            const bowRect = elements.bow.getBoundingClientRect();
+            const startX = bowRect.left + bowRect.width / 2 - rect.left;
+            const startY = bowRect.top + bowRect.height / 2 - rect.top;
+            
+            const dx = mouseX - startX;
+            const dy = mouseY - startY;
+            const angle = Math.atan2(dy, dx);
+            const speed = 15;
+            
+            // Create Arrow Element
+            const arrow = document.createElement('div');
+            arrow.className = 'arrow';
+            
+            // Set initial position
+            arrow.style.left = `${startX}px`;
+            arrow.style.top = `${startY}px`;
+            
+            // Rotate arrow to face target
+            const rotation = angle * (180 / Math.PI);
+            arrow.style.transform = `rotate(${rotation}deg)`;
+            
+            elements.arrowsContainer.appendChild(arrow);
+            
+            // Store arrow data for animation
+            arrow.dataset.x = startX;
+            arrow.dataset.y = startY;
+            arrow.dataset.vx = Math.cos(angle) * speed;
+            arrow.dataset.vy = Math.sin(angle) * speed;
+        }
+
+        function moveArrows() {
+            const arrows = document.querySelectorAll('.arrow');
+            const rect = elements.gameArea.getBoundingClientRect();
+            
+            arrows.forEach(arrow => {
+                let x = parseFloat(arrow.dataset.x);
+                let y = parseFloat(arrow.dataset.y);
+                const vx = parseFloat(arrow.dataset.vx);
+                const vy = parseFloat(arrow.dataset.vy);
+                
+                x += vx;
+                y += vy;
+                
+                arrow.dataset.x = x;
+                arrow.dataset.y = y;
+                arrow.style.left = `${x}px`;
+                arrow.style.top = `${y}px`;
+                
+                // Remove if out of bounds
+                if (x < -50 || x > rect.width + 50 || y < -50 || y > rect.height + 50) {
+                    arrow.remove();
+                }
+            });
+        }
+
+        // --- Collision & Score ---
+
+        function checkCollisions() {
+            const arrows = document.querySelectorAll('.arrow');
+            const targetRect = elements.target.getBoundingClientRect();
+            
+            arrows.forEach(arrow => {
+                const arrowRect = arrow.getBoundingClientRect();
+                
+                // Simple AABB collision detection
+                // We check the center point of the arrow tip for better accuracy
+                const arrowTipX = arrowRect.right;
+                const arrowTipY = arrowRect.top + arrowRect.height / 2;
+                
+                if (
+                    arrowTipX >= targetRect.left &&
+                    arrowTipX <= targetRect.right &&
+                    arrowTipY >= targetRect.top &&
+                    arrowTipY <= targetRect.bottom
+                ) {
+                    // Hit!
+                    handleHit(arrow);
+                }
+            });
+        }
+
+        function handleHit(arrowElement) {
+            // Remove arrow
+            arrowElement.remove();
+            
+            // Update Score
+            state.score += 10;
+            updateScore();
+            
+            // Increase Difficulty
+            increaseDifficulty();
+            
+            // Visual Feedback
+            flashTarget();
+            
+            // Reset Target Position immediately to prevent double hits
+            resetTargetPosition();
+        }
+
+        function updateScore() {
+            elements.scoreDisplay.textContent = state.score;
+        }
+
+        function flashTarget() {
+            elements.target.style.filter = "brightness(1.5)";
+            setTimeout(() => {
+                elements.target.style.filter = "brightness(1)";
+            }, 100);
+        }
+
+        function increaseDifficulty() {
+            // Every 50 points, increase speed and decrease size
+            const level = Math.floor(state.score / 50) + 1;
+            state.difficultyMultiplier = 1 + (level * 0.1);
+            
+            // Decrease size slightly but not too small (min 40px)
+            const newSize = Math.max(40, 80 - (level * 5));
+            if (newSize !== state.targetSize) {
+                state.targetSize = newSize;
+            }
+        }
+
+        // --- Timer Logic ---
+
+        function updateTimer() {
+            state.timeLeft--;
+            elements.timeDisplay.textContent = state.timeLeft;
+            
+            if (state.timeLeft <= 0) {
+                gameOver();
+            }
+        }
+
+        function updateUI() {
+            elements.scoreDisplay.textContent = state.score;
+            elements.timeDisplay.textContent = state.timeLeft;
+        }
+
+        // Initial setup
+        updateTargetStyle();
+
+    </script>
+</body>
+</html>
