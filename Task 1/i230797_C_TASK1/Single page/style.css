@@ -1,0 +1,32 @@
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    font-family: Arial, sans-serif;
+}
+
+.page-content {
+    flex: 1;
+}
+
+section {
+    padding: 80px 0;
+}
+
+.gallery-img {
+    height: 250px;
+    object-fit: cover;
+}
+
+.auth-simple {
+    max-width: 350px;
+    margin: auto;
+}
+
+.back-link {
+    font-size: 14px;
+    text-decoration: none;
+}
