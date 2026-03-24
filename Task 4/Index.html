@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Website</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <a href="#/" class="nav-link active">Home</a>
+    <a href="#/about" class="nav-link">About</a>
+    <a href="#/contact" class="nav-link">Contact</a>
+  </nav>
+
+  <!-- Home Page -->
+  <div id="page-home" class="page active">
+    <h1>Welcome</h1>
+    <p>This is a simple single-page website with client-side routing. Use the navigation above to switch between pages without reloading.</p>
+  </div>
+
+  <!-- About Page -->
+  <div id="page-about" class="page">
+    <h1>About</h1>
+    <p>This application demonstrates hash-based routing using vanilla HTML, CSS, and JavaScript. Each page is a section that gets shown or hidden based on the URL hash.</p>
+    <p>The Contact page includes a controlled form where all input values are tracked in JavaScript state.</p>
+  </div>
+
+  <!-- Contact Page -->
+  <div id="page-contact" class="page">
+    <h1>Contact</h1>
+    <p>Fill out the form below. On submit, the data is logged to the console and the fields are cleared.</p>
+
+    <div id="success-msg" class="success hidden">Message sent! Check the console.</div>
+
+    <div id="form-wrapper">
+      <label for="name">Name</label>
+      <input type="text" id="name" placeholder="Your name" />
+
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="you@example.com" />
+
+      <label for="message">Message</label>
+      <textarea id="message" rows="4" placeholder="Your message..."></textarea>
+
+      <button id="submit-btn">Send</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
