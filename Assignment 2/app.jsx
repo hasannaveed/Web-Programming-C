@@ -443,3 +443,40 @@ function CricketField({ phase, ballProgress, batSwing, lastResult, hitBallPos, s
   );
 }
  
+function PowerBar({ style, sliderPos, active }) {
+  const probs = PROBS[style];
+  return (
+    <div style={{ position: "relative", width: "100%", maxWidth: 500, margin: "0 auto" }}>
+      <div style={{ display: "flex", height: 38, borderRadius: 8, overflow: "hidden", border: "2px solid #333", position: "relative" }}>
+        {probs.map((seg, i) => (
+          <div key={i} style={{
+            width: `${seg.prob * 100}%`, background: seg.color,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: seg.prob < 0.06 ? 9 : 12, fontWeight: 700, color: "#fff",
+            textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+            borderRight: i < probs.length - 1 ? "1px solid rgba(0,0,0,0.3)" : "none",
+          }}>
+            {seg.label}
+          </div>
+        ))}
+        <div style={{
+          position: "absolute", left: `${sliderPos * 100}%`, top: -6, bottom: -6, width: 3,
+          background: "#fff", boxShadow: "0 0 8px rgba(255,255,255,0.8), 0 0 3px #000",
+          transition: active ? "none" : "left 0.1s", zIndex: 10,
+        }} />
+        <div style={{
+          position: "absolute", left: `calc(${sliderPos * 100}% - 6px)`, top: -12,
+          width: 0, height: 0, borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+          borderTop: "8px solid #fff", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))", zIndex: 10,
+        }} />
+      </div>
+      <div style={{ display: "flex", marginTop: 4 }}>
+        {probs.map((seg, i) => (
+          <div key={i} style={{ width: `${seg.prob * 100}%`, textAlign: "center", fontSize: 9, color: "#aaa", fontFamily: "monospace" }}>
+            {(seg.prob * 100).toFixed(0)}%
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
