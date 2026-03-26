@@ -480,3 +480,364 @@ function PowerBar({ style, sliderPos, active }) {
     </div>
   );
 }
+
+// ─── Main Game ───
+export default function CricketGame() {
+  const [runs, setRuns] = useState(0);
+  const [wickets, setWickets] = useState(0);
+  const [ballsBowled, setBallsBowled] = useState(0);
+  const [battingStyle, setBattingStyle] = useState("aggressive");
+  const [phase, setPhase] = useState("idle");
+  const [sliderPos, setSliderPos] = useState(0);
+  const [sliderActive, setSliderActive] = useState(true);
+  const [ballProgress, setBallProgress] = useState(0);
+  const [batSwing, setBatSwing] = useState(0);
+  const [lastResult, setLastResult] = useState(null);
+  const [hitBallPos, setHitBallPos] = useState(null);
+  const [stumpsHit, setStumpsHit] = useState(null);
+  const [commentary, setCommentary] = useState("Choose your batting style and play a shot!");
+  const [bestScore, setBestScore] = useState(0);
+  const [ballLog, setBallLog] = useState([]);
+ 
+  const sliderRef = useRef(null);
+  const animRef = useRef(null);
+ 
+  const gameOver = wickets >= TOTAL_WICKETS || ballsBowled >= TOTAL_BALLS;
+ 
+  // Slider oscillation
+  useEffect(() => {
+    if (phase !== "idle" || gameOver) {
+      if (sliderRef.current) cancelAnimationFrame(sliderRef.current);
+      return;
+    }
+    let dir = 1, pos = 0;
+    const speed = 0.007;
+    const animate = () => {
+      pos += speed * dir;
+      if (pos >= 1) { pos = 1; dir = -1; }
+      if (pos <= 0) { pos = 0; dir = 1; }
+      setSliderPos(pos);
+      sliderRef.current = requestAnimationFrame(animate);
+    };
+    sliderRef.current = requestAnimationFrame(animate);
+    setSliderActive(true);
+    return () => { if (sliderRef.current) cancelAnimationFrame(sliderRef.current); };
+  }, [phase, gameOver]);
+ 
+  const playShot = useCallback(() => {
+    if (phase !== "idle" || gameOver) return;
+    const currentPos = sliderPos;
+    setSliderActive(false);
+    setHitBallPos(null);
+    setStumpsHit(null);
+ 
+    // PHASE 1: Bowling (ball travels from bowler to batsman)
+    setPhase("bowling");
+    let frame = 0;
+    const bowlDuration = 60;
+ 
+    const bowlAnim = () => {
+      frame++;
+      const t = frame / bowlDuration;
+      const progress = t * t * (3 - 2 * t); // smoothstep easing
+      setBallProgress(progress);
+ 
+      if (frame < bowlDuration) {
+        animRef.current = requestAnimationFrame(bowlAnim);
+      } else {
+        // PHASE 2: Bat swing
+        setPhase("batting");
+        let swing = 0;
+        const swingAnim = () => {
+          swing += 0.08;
+          setBatSwing(swing);
+          if (swing < 1.2) {
+            animRef.current = requestAnimationFrame(swingAnim);
+          } else {
+            const outcome = getOutcome(battingStyle, currentPos);
+            setLastResult(outcome);
+            const key = outcome.runs === -1 ? "W" : String(outcome.runs);
+            const msgs = COMMENTARY[key];
+            setCommentary(msgs[Math.floor(Math.random() * msgs.length)]);
+ 
+            if (outcome.runs === -1) {
+              setWickets(w => w + 1);
+            } else {
+              setRuns(r => r + outcome.runs);
+            }
+            setBallsBowled(b => b + 1);
+            setBallLog(log => [...log, { ball: ballsBowled + 1, style: battingStyle, result: key }]);
+ 
+            // PHASE 3: Post-hit animation
+            if (outcome.runs === -1) {
+              // Stumps flying
+              setPhase("hitanim");
+              let st = 0;
+              const stumpAnim = () => {
+                st += 0.04;
+                setStumpsHit(st);
+                if (st < 1) {
+                  animRef.current = requestAnimationFrame(stumpAnim);
+                } else {
+                  setPhase("result");
+                  finishBall(outcome);
+                }
+              };
+              animRef.current = requestAnimationFrame(stumpAnim);
+            } else if (outcome.runs >= 4) {
+              // Boundary hit: ball flies to fence / over stands
+              setPhase("hitanim");
+              const angle = outcome.runs === 6
+                ? -Math.PI * 0.5 + (Math.random() - 0.5) * 0.6
+                : -Math.PI * 0.3 + (Math.random() - 0.5) * 1.2;
+              let bf = 0;
+              const trail = [];
+              const hitAnim = () => {
+                bf += 0.025;
+                const dist = bf * 300;
+                const bx = 250 + 18 + Math.cos(angle) * dist;
+                const by_base = 312 + Math.sin(angle) * dist;
+                const arc = outcome.runs === 6 ? -Math.sin(bf * Math.PI) * 120 : 0;
+                const ballSize = outcome.runs === 6 ? 5 + bf * 3 : 5 - bf * 2;
+                trail.push({ x: bx, y: by_base + arc });
+                if (trail.length > 8) trail.shift();
+                setHitBallPos({ x: bx, y: by_base + arc, size: Math.max(2, ballSize), trail: [...trail] });
+                if (bf < 1) {
+                  animRef.current = requestAnimationFrame(hitAnim);
+                } else {
+                  setPhase("result");
+                  finishBall(outcome);
+                }
+              };
+              animRef.current = requestAnimationFrame(hitAnim);
+            } else {
+              // Dot / singles / doubles: ball rolls on ground
+              setPhase("hitanim");
+              let rf = 0;
+              const rollAngle = -Math.PI * 0.4 + Math.random() * 0.8;
+              const rollDist = outcome.runs === 0 ? 40 : 60 + outcome.runs * 30;
+              const trail = [];
+              const rollAnim = () => {
+                rf += 0.04;
+                const d = rf * rollDist;
+                const rx = 250 + 18 + Math.cos(rollAngle) * d;
+                const ry = 312 + Math.sin(rollAngle) * d;
+                trail.push({ x: rx, y: ry });
+                if (trail.length > 6) trail.shift();
+                setHitBallPos({ x: rx, y: ry, size: 4, trail: [...trail] });
+                if (rf < 1) {
+                  animRef.current = requestAnimationFrame(rollAnim);
+                } else {
+                  setPhase("result");
+                  finishBall(outcome);
+                }
+              };
+              animRef.current = requestAnimationFrame(rollAnim);
+            }
+          }
+        };
+        animRef.current = requestAnimationFrame(swingAnim);
+      }
+    };
+    animRef.current = requestAnimationFrame(bowlAnim);
+ 
+    function finishBall(outcome) {
+      setTimeout(() => {
+        setBatSwing(0);
+        setBallProgress(0);
+        setHitBallPos(null);
+        setStumpsHit(null);
+        setLastResult(null);
+        const newW = wickets + (outcome.runs === -1 ? 1 : 0);
+        const newB = ballsBowled + 1;
+        if (newW >= TOTAL_WICKETS || newB >= TOTAL_BALLS) {
+          setPhase("gameover");
+          const finalR = runs + (outcome.runs > 0 ? outcome.runs : 0);
+          setBestScore(b => Math.max(b, finalR));
+        } else {
+          setPhase("idle");
+        }
+      }, 1400);
+    }
+  }, [phase, gameOver, sliderPos, battingStyle, wickets, ballsBowled, runs]);
+ 
+  const restartGame = () => {
+    setRuns(0); setWickets(0); setBallsBowled(0); setBattingStyle("aggressive");
+    setPhase("idle"); setSliderPos(0); setSliderActive(true);
+    setBallProgress(0); setBatSwing(0); setLastResult(null);
+    setHitBallPos(null); setStumpsHit(null);
+    setCommentary("Choose your batting style and play a shot!"); setBallLog([]);
+  };
+ 
+  const strikeRate = ballsBowled > 0 ? ((runs / ballsBowled) * 100).toFixed(1) : "0.0";
+ 
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0a1628 0%, #1a2d4a 40%, #0d2233 100%)",
+      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      color: "#e8e8e8", padding: "12px 8px",
+      display: "flex", flexDirection: "column", alignItems: "center",
+    }}>
+      {/* Header */}
+      <div style={{
+        textAlign: "center", marginBottom: 12, padding: "8px 24px",
+        background: "linear-gradient(90deg, transparent, rgba(45,138,78,0.3), transparent)",
+        borderBottom: "2px solid #2d8a4e",
+      }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: 2, color: "#4ade80", textShadow: "0 0 20px rgba(74,222,128,0.3)" }}>
+          🏏 CRICKET CHAMPION
+        </h1>
+        <div style={{ fontSize: 10, color: "#6b9e7a", letterSpacing: 4, marginTop: 2 }}>2D BATTING SIMULATOR</div>
+      </div>
+ 
+      {/* Scoreboard */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, width: "100%", maxWidth: 500, marginBottom: 12 }}>
+        {[
+          { label: "RUNS", value: runs, color: "#4ade80" },
+          { label: "WICKETS", value: `${wickets}/${TOTAL_WICKETS}`, color: "#f87171" },
+          { label: "OVERS", value: formatOvers(ballsBowled), color: "#60a5fa" },
+          { label: "SR", value: strikeRate, color: "#fbbf24" },
+        ].map(item => (
+          <div key={item.label} style={{
+            background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "8px 4px",
+            textAlign: "center", border: "1px solid rgba(255,255,255,0.1)",
+          }}>
+            <div style={{ fontSize: 9, color: "#888", letterSpacing: 1, marginBottom: 2 }}>{item.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: item.color }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+ 
+      {/* Cricket Field */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+        <CricketField phase={phase} ballProgress={ballProgress} batSwing={batSwing} lastResult={lastResult} hitBallPos={hitBallPos} stumpsHit={stumpsHit} />
+      </div>
+ 
+      {/* Commentary */}
+      <div style={{
+        width: "100%", maxWidth: 500, background: "rgba(0,0,0,0.4)", borderRadius: 8,
+        padding: "8px 14px", marginBottom: 12, textAlign: "center", fontSize: 13,
+        fontStyle: "italic", color: "#fbbf24", borderLeft: "3px solid #fbbf24",
+        minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {commentary}
+      </div>
+ 
+      {/* Power Bar */}
+      {!gameOver && (
+        <div style={{ width: "100%", maxWidth: 500, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: "#888", marginBottom: 4, textAlign: "center", letterSpacing: 1 }}>
+            POWER BAR — {battingStyle.toUpperCase()} MODE
+          </div>
+          <PowerBar style={battingStyle} sliderPos={sliderPos} active={sliderActive} />
+        </div>
+      )}
+ 
+      {/* Controls */}
+      {!gameOver ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: "100%", maxWidth: 500 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {["aggressive", "defensive"].map(s => (
+              <button key={s} onClick={() => phase === "idle" && setBattingStyle(s)} disabled={phase !== "idle"}
+                style={{
+                  padding: "8px 20px", borderRadius: 8,
+                  border: battingStyle === s ? "2px solid" : "2px solid rgba(255,255,255,0.15)",
+                  borderColor: battingStyle === s ? (s === "aggressive" ? "#ef4444" : "#3b82f6") : "rgba(255,255,255,0.15)",
+                  background: battingStyle === s ? (s === "aggressive" ? "rgba(239,68,68,0.2)" : "rgba(59,130,246,0.2)") : "rgba(255,255,255,0.05)",
+                  color: battingStyle === s ? "#fff" : "#888",
+                  fontSize: 13, fontWeight: 700, cursor: phase === "idle" ? "pointer" : "not-allowed",
+                  letterSpacing: 1, textTransform: "uppercase", opacity: phase !== "idle" ? 0.5 : 1,
+                }}>
+                {s === "aggressive" ? "⚡ Aggressive" : "🛡️ Defensive"}
+              </button>
+            ))}
+          </div>
+          <button onClick={playShot} disabled={phase !== "idle"}
+            style={{
+              padding: "14px 48px", borderRadius: 12, border: "none",
+              background: phase === "idle" ? "linear-gradient(135deg, #16a34a, #22c55e)" : "rgba(255,255,255,0.1)",
+              color: "#fff", fontSize: 16, fontWeight: 800, cursor: phase === "idle" ? "pointer" : "not-allowed",
+              letterSpacing: 2, boxShadow: phase === "idle" ? "0 4px 20px rgba(34,197,94,0.4)" : "none",
+              textTransform: "uppercase", opacity: phase !== "idle" ? 0.5 : 1,
+            }}>
+            {phase === "idle" ? "🏏 PLAY SHOT" : phase === "bowling" ? "⏳ BOWLING..." : phase === "result" ? "✨ RESULT" : "🏏 HITTING..."}
+          </button>
+        </div>
+      ) : (
+        <div style={{
+          textAlign: "center", padding: 20, background: "rgba(0,0,0,0.5)", borderRadius: 16,
+          border: "2px solid rgba(255,255,255,0.1)", width: "100%", maxWidth: 500,
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 900, color: "#fbbf24", marginBottom: 8, textShadow: "0 0 20px rgba(251,191,36,0.4)" }}>
+            🏁 INNINGS OVER
+          </div>
+          <div style={{ fontSize: 16, color: "#ccc", marginBottom: 4 }}>
+            Final Score: <span style={{ color: "#4ade80", fontWeight: 800, fontSize: 24 }}>{runs}</span> / {wickets}
+          </div>
+          <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>
+            Overs: {formatOvers(ballsBowled)} &nbsp;|&nbsp; Strike Rate: {strikeRate}
+          </div>
+          <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>Best Score: {bestScore}</div>
+          {ballLog.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: "#888", marginBottom: 6, letterSpacing: 1 }}>BALL-BY-BALL</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
+                {ballLog.map((b, i) => (
+                  <div key={i} style={{
+                    width: 28, height: 28, borderRadius: "50%",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 700,
+                    background: b.result === "W" ? "#dc2626" : b.result === "4" || b.result === "6" ? "#16a34a" : b.result === "0" ? "#4b5563" : "#2563eb",
+                    color: "#fff", border: b.style === "aggressive" ? "2px solid #ef4444" : "2px solid #3b82f6",
+                  }}>
+                    {b.result}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <button onClick={restartGame} style={{
+            padding: "12px 36px", borderRadius: 10, border: "none",
+            background: "linear-gradient(135deg, #2563eb, #3b82f6)", color: "#fff",
+            fontSize: 15, fontWeight: 700, cursor: "pointer", letterSpacing: 1,
+            boxShadow: "0 4px 16px rgba(37,99,235,0.4)",
+          }}>
+            🔄 RESTART GAME
+          </button>
+        </div>
+      )}
+ 
+      {/* Probability Tables */}
+      <div style={{ width: "100%", maxWidth: 500, marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {["aggressive", "defensive"].map(s => (
+          <div key={s} style={{
+            background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: 8,
+            border: `1px solid ${s === "aggressive" ? "rgba(239,68,68,0.2)" : "rgba(59,130,246,0.2)"}`,
+          }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700,
+              color: s === "aggressive" ? "#f87171" : "#60a5fa",
+              letterSpacing: 1, marginBottom: 6, textAlign: "center", textTransform: "uppercase",
+            }}>
+              {s === "aggressive" ? "⚡ Aggressive" : "🛡️ Defensive"}
+            </div>
+            {PROBS[s].map(seg => (
+              <div key={seg.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 10, padding: "2px 4px", color: "#aaa" }}>
+                <span>
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: seg.color, marginRight: 4, verticalAlign: "middle" }} />
+                  {seg.label === "W" ? "Wicket" : `${seg.label} Run${seg.runs !== 1 ? "s" : ""}`}
+                </span>
+                <span style={{ fontFamily: "monospace" }}>{(seg.prob * 100).toFixed(0)}%</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 9, color: "#444", marginTop: 12, textAlign: "center" }}>
+        2 Overs • {TOTAL_WICKETS} Wickets • Probability-Based Power Bar System
+      </div>
+    </div>
+  );
+}
+ 
